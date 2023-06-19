@@ -3,7 +3,7 @@ __Full native Z80 Graphics Library for the 128x64 Pixel LCD Screen__
 
 <img src="LCD_example.png" width="700">
 
-    The above image demonstrates most of the graphical routines.  This includes line drawing, circles, filled shapes, text and pixel drawing.
+The above image demonstrates most of the graphical routines.  This includes line drawing, circles, filled shapes, text and pixel drawing.
 
 ---
 
