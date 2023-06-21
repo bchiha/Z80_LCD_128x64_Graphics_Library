@@ -14,14 +14,14 @@
 ;
 ; The Pinout for the QC12864B board is as follows:
 ;
-; Pin	Name	Desc			Seri	Para
-; ---   ----    -------------   ------  -------------
-; 1		VSS		Ground			GND		GND
-; 2		VDD		Power			5v		5v
-; 3		V0		Contrast		N/A		N/A
-; 4		D/I		IR/DR (CS)		D0		A7
-; 5		R/W		R/W (SID)		D1		RD (inverted)
-; 6		E		Enable (SCLK)	D2		Port 7 (inverted)
+; Pin	Name	Desc			        Seri	Para
+; ---   ----    -------------                   ------  -------------
+; 1	VSS		Ground			GND		GND
+; 2	VDD		Power			5v		5v
+; 3	V0		Contrast		N/A		N/A
+; 4	D/I		IR/DR (CS)		D0		A7
+; 5	R/W		R/W (SID)		D1		RD (inverted)
+; 6	E		Enable (SCLK)	D2		Port 7 (inverted)
 ; 7 	DB0		Data			N/A		D0
 ; 8 	DB1		Data			N/A		D1
 ; 9 	DB2		Data			N/A		D2
@@ -707,10 +707,10 @@ INIT_BASIC:
         
 GBUF:	DS 0400H 		;Graphics Buffer 16 * 64 = 1024 byte
 ENDPT:	DW 0000H 		;End Point for Line
-SX:		DB 00H 			;Sign of X
-SY:		DB 00H 			;Sign of Y
-DX:		DW 0000H 		;Change of X
-DY:		DW 0000H 		;Change of Y
+SX:	DB 00H 			;Sign of X
+SY:	DB 00H 			;Sign of Y
+DX:	DW 0000H 		;Change of X
+DY:	DW 0000H 		;Change of Y
 ERR:	DW 0000H 		;Error Rate
 RAD:	DW 0000H 		;Radius
 CLRBUF:	DB 00H 			;Clear Buffer Flag on LCD Displaying
