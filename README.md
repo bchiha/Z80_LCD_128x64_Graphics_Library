@@ -86,6 +86,8 @@ To see the library working, have a look at the example code provided.  The [LDC\
 
 Also, see the library and these files in action on [YouTube](https://youtu.be/xADbvfVs6Mg)!
 
+Thanks to [PCBWay](https://www.pcbway.com) for sponsoring this video.  ** For $5 off your first order at PCBWay, click [here](https://www.pcbway.com/setinvite.aspx?inviteid=599966) **.  PCBWay Printed Circuit Boards the Easy Way.
+
 ## Programming Guide
 
 The Graphics Library has routines that interact with the LCD Screen.  Routines are called via a __Jumpblock__.  These routines are at the start of the Graphics Library.  By default the library is placed at location `0x3000`.  If this location is changed, the start locations of the functions are also to be changed.
