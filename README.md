@@ -1,7 +1,7 @@
 # Z80 LCD 128x64 Graphics Library <!-- omit in toc -->
 __Full native Z80 Graphics Library for the 128x64 Pixel LCD Screen__
 
-<img src="LCD_example.png" width="700">
+<img src="img\LCD_example.png" width="700">
 
 The above image demonstrates most of the graphical routines.  This includes line drawing, circles, filled shapes, text and pixel drawing.
 
@@ -10,6 +10,7 @@ The above image demonstrates most of the graphical routines.  This includes line
 - [Files in this repository](#files-in-this-repository)
 - [LCD Screens](#lcd-screens)
 - [Example Code](#example-code)
+- [Configuration](#configuration)
 - [Programming Guide](#programming-guide)
   - [INIT\_LCD](#init_lcd)
   - [CLEAR\_GBUF](#clear_gbuf)
@@ -30,19 +31,28 @@ The above image demonstrates most of the graphical routines.  This includes line
   - [DELAY\_MS:](#delay_ms)
   - [SET\_BUF\_CLEAR](#set_buf_clear)
   - [SET\_BUF\_NO\_CLEAR](#set_buf_no_clear)
+  - [CLEAR\_PIXEL](#clear_pixel)
+  - [FLIP\_PIXEL](#flip_pixel)
+  - [LCD\_INST](#lcd_inst)
+  - [LCD\_DATA](#lcd_data)
+  - [SER\_SYNC](#ser_sync)
 - [Future Work](#future-work)
 
 ## Files in this repository
   * lcd_128x64_glib.z80 - Z80 Graphics library for the ST7920 Controller
   * lcd_3d_demo.z80 - 3D Frame rotation program
   * lcd_mad_program.z80 - MAD Magazine face drawing
+  * lcd_maze_gen.z80 - Maze Generation program
   * ST7920.pdf - ST7920 Datasheet
   * QC12864B.pdf - LCD Screen Datasheet
   * 3D_Fundamentals.JPG - Amstrad Basic 3D Frame article
+  * [add_on_PCB](./add_on_PCB) directory - Add-on Board for the TEC-1 Computer
 
 ## LCD Screens
 There are a few variants of these LCD screens, but all typically use the [ST7920](./ST7920.pdf) LCD Controller.  The LCD Screen that I used is the [QC12864B](./QC12864B.pdf).  This screen has two ST7921 Panels (128 x 32) stacked one above the other.  Other LCD boards might not do this.  If so, the [PLOT\_TO\_LCD](#plot_to_lcd) function will need to be modified. (future work)
 
+<img src="img\QC12864B_front.png" style="float: left;" width="400">
+<img src="img\QC12864B_back.png" width="400">
 These screens have Graphics Display RAM (GDRAM) and Display Data RAM (DDRAM) areas.  GDRAM is for drawing pixels and DDRAM is for displaying text or characters.  Both RAM areas __can be__ displayed at the same time.
 
 The Pinout and connection to the Z80 for the QC12864B board is as follows:
@@ -52,9 +62,9 @@ The Pinout and connection to the Z80 for the QC12864B board is as follows:
 | 1 | VSS | Ground | GND | GND |
 | 2 | VDD | Power | 5v | 5v |
 | 3 | V0 | Contrast | N/A | N/A |
-| 4 | D/I | IR/DR (CS) | D2 | A7<sup>4</sup> |
-| 5 | R/W | R/W (SID) | D1 | RD (inverted)<sup>2</sup> |
-| 6 | E | Enable (SCLK) | D0 | Port 7 <sup>4</sup> (inverted)<sup>2</sup> |
+| 4 | D/I | IR/DR (CS) | 5v | A7<sup>4</sup> |
+| 5 | R/W | R/W (SID) | D0 | RD (inverted)<sup>2</sup> |
+| 6 | E | Enable (SCLK) | D1 | Port 7 <sup>4</sup> (inverted)<sup>2</sup> |
 | 7 | DB0 | Data | N/A | D0 |
 | 8 | DB1 | Data | N/A | D1 |
 | 9 | DB2 | Data | N/A | D2 |
@@ -70,21 +80,25 @@ The Pinout and connection to the Z80 for the QC12864B board is as follows:
 | 19 | A | Backlight | 5v/NC | 5v/NC |
 | 20 | K | Backlight | GND/NC | GND/NC |
 
-__<sup>1</sup>__ At this stage only Parallel connection is possible with this library.  When I get around to it, I will implement SPI Serial connection.  This will require a 74HC374 D-Flip Flop latch.
+__<sup>1</sup>__ Three communication lines are need for Serial SPI transfer.  Pin 4 is Chip Select (CS).  As there is only one peripheral connected, this can just be tied high at 5v.  Pin 5 is Serial Input Data (SID) and Pin 6 is Serial Clock (SCLK).  Pin 5 and 6 are to be latched via a 74HC74 Dual D-Flip Flop.  The inputs to the latch are D0 (SID) and D1 (SCLK).  Have a look at the schematic below.
 
-__<sup>2</sup>__ A CMOS CD4049 Inverter Buffer is needed to invert the pin
+__<sup>2</sup>__ A CMOS CD4049 Inverter Buffer is needed to invert the input
 
 __<sup>3</sup>__ Some 128x64 LCD Screens have different Pinouts than in the table above.
 
 __<sup>4</sup>__ I use `Port 7` and `A7` to connect the LCD screen to the TEC computer.  You will need to modify these two constants if connecting the LCD in a different way.  See the header part of the [lcd_128x64_glib.z80](lcd_128x64_glib.z80) file to modify these values.
 
-<img src="LCD_connection.png" width="700">
+<img src="img\LCD_connection.png" style="float: left;" width="400">
+<img src="img\LCD_sconnection.png" width="400">
 
 ## Example Code
 
 To see the library working, have a look at the example code provided.  The [LDC\_3D\_demo.z80](lcd_3d_demo.z80) has a `DISPLAY_MENU` label that displays the above picture.  Look at this piece of code for better understanding.
 
 Also, see the library and these files in action on [YouTube](https://youtu.be/xADbvfVs6Mg)!
+
+## Configuration
+
 
 ## Programming Guide
 
@@ -122,6 +136,11 @@ In summary, here are the routines and their default address locations:
 | 3030H | [DELAY\_MS](#delay_ms) | Millisecond delay for LCD updates |
 | 3033H | [SET\_BUF\_CLEAR](#set_buf_clear) | Clear the Graphics buffer on after Plotting to the screen |
 | 3036H | [SET\_BUF\_NO\_CLEAR](#set_buf_no_clear) | Retain the Graphics buffer on after Plotting to the screen |
+| 3039H | [CLEAR\_PIXEL](#clear_pixel) | Clear one pixel at X,Y |
+| 303CH | [FLIP\_PIXEL](#flip_pixel) | Invert one pixel at X,Y |
+| 303FH | [LCD\_INST](#lcd_inst) | Send a parallel or serial instruction to LCD |
+| 3042H | [LCD\_DATA](#lcd_data) | Send a parallel or serial data to LCD |
+| 3045H | [SER\_SYNC](#ser_sync) | Send serial synchronize byte to LCD |
 
 Here is the detailed routine descriptions with examples
 
@@ -304,7 +323,7 @@ This routine draws the Graphics Buffer or GBUF to the Graphics LDC screen.  It i
 Prints ASCII text on the screen on a given row.   There are 4 text rows on the LCD screen.  The text to be displayed is to be defined directly after the CALL routine and is to be terminated with a zero.  
 
 Here are the 128 characters that are available.  Conveniently, Alphanumeric characters align with the ASCII table.
-<img src="character_map.png" width="700">
+<img src="img\character_map.png" width="700">
 
 - Entry:
   - A = row number (0-3)
@@ -392,11 +411,85 @@ Do not clear the graphics buffer on every [PLOT\_TO\_LCD](#plot_to_lcd).  Callin
     CALL SET_BUF_NO_CLEAR    ;Do not clear GBUF on plot
 ```
 
+### CLEAR_PIXEL
+
+Removes or clears a single Pixel.
+
+- Entry:
+  - B = X-coordinate (0-127)
+  - C = Y-coordinate (0-63)
+- Exit: AF, HL corrupt
+
+```
+    LD BC, 4020H 	;X,Y
+    CALL CLEAR_PIXEL
+```
+
+### FLIP_PIXEL
+
+Inverts a single Pixel.  If the Pixel is on, it will turn off and if the Pixel is off, it will turn on.
+
+- Entry:
+  - B = X-coordinate (0-127)
+  - C = Y-coordinate (0-63)
+- Exit: AF, HL corrupt
+
+```
+    LD BC, 4020H 	;X,Y
+    CALL FLIP_PIXEL
+```
+
+### LCD_INST
+
+Send an instruction to the LCD.  This routine will send the value of Register `A` to the Instruction Register of the LCD Screen.  The routine is universal regardless of Serial or Parallel connection.
+For Serial connection, this will also send the Synchronization Byte.
+
+- Entry:
+  - A = Value to send
+- Exit: AF, DE (Parallel only) corrupt
+
+```
+    LD A, 38H   ; Clear Screen 
+    CALL LCD_INST
+```
+
+### LCD_DATA
+
+Send data to the LCD.  This routine will send the value of Register `A` to the Data Register of the LCD Screen.  The routine is universal regardless of Serial or Parallel connection.  
+__For Serial connection__, a call to [SER\_SYNC](#ser_sync) is to be done prior.  This is because only one Synchronization Byte is needed for multiple (up to 256) Data bytes.
+
+- Entry:
+  - A = Value to send
+- Exit: AF, DE (Parallel only) corrupt
+
+```
+    ;Parallel example
+    LD A, "B"   ; The letter B
+    CALL LCD_DATA
+```
+
+### SER_SYNC
+
+Send a Serial Synchronization Byte to the LCD.  This routine is only needed for Serial connection __AND__ prior to an [LCD\_DATA](#lcd_data) call.  The Register `A` must be `02H`
+
+- Entry:
+  - A = 02H 
+- Exit: AF corrupt
+
+```
+    LD A, 02H 
+    CALL SER_SYNC   ;Data Block Sync
+    LD A,  "T"      ;Letter T
+    CALL LCD_DATA
+    LD A,  "E"      ;Letter E
+    CALL LCD_DATA
+    LD A,  "C"      ;Letter C
+    CALL LCD_DATA
+```
+
 ## Future Work
 
-Displaying Text on this screen in a bit clumsily as text can only be placed at defined locations.  I plan to make a graphics font of 128 characters that is smaller in size, possibly 5x7 and can be placed anywhere on the screen.
-
-Serial connection is possible on this type of screen.  Adding a way to send data via SPI protocol will make the library usable on more devices and on OLED screens.  OLED screens usually are superior to LCD screens when moving pixels on the screen.
+Displaying Text on this screen is clumsy as text can only be placed at defined locations.  I plan to make a graphics font of 128 characters that is smaller in size, possibly 5x7 and can be placed anywhere on the screen.
 
 Some LCD screens have a slightly different way data is written to them in terms of how the screens are laid out.  The [QC12864B](./QC12864B.pdf) as two ST9721 screens placed on top of each other, but are connected in series.  Plotting to the LCD routine will need to be changed for other LCD screen layouts.
 

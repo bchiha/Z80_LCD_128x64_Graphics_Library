@@ -14,33 +14,31 @@
 ;
 ; The Pinout for the QC12864B board is as follows:
 ;
-; Pin	Name	Desc			        Seri	Para
-; ---   ----    -------------                   ------  -------------
-; 1	VSS		Ground			GND		GND
-; 2	VDD		Power			5v		5v
-; 3	V0		Contrast		N/A		N/A
-; 4	D/I		IR/DR (CS)		D0		A7
-; 5	R/W		R/W (SID)		D1		RD (inverted)
-; 6	E		Enable (SCLK)	D2		Port 7 (inverted)
-; 7 	DB0		Data			N/A		D0
-; 8 	DB1		Data			N/A		D1
-; 9 	DB2		Data			N/A		D2
-; 10 	DB3		Data			N/A		D3
-; 11 	DB4		Data			N/A		D4
-; 12 	DB5		Data			N/A		D5
-; 13	DB6		Data			N/A		D6
-; 14	DB7		Data			N/A		D7
-; 15	PSB		Serial/Para		GND		5v
-; 16	NC
-; 17	RST		Reset			RST		RST
-; 18	VEE		LCD Drive		N/A		N/A
-; 19	A		Backlight		5v/NC	5v/NC
-; 20	K		Backlight		GND/NC	GND/NC
+; Pin	Name	Desc                    Serial  Parallel
+; ---   ----    -------------           ------  -------------
+; 1     VSS     Ground                  GND     GND
+; 2     VDD     Power                   5v      5v
+; 3     V0      Contrast                N/A     N/A
+; 4     D/I     IR/DR (CS)              5v      A7
+; 5     R/W     R/W (SID)               D0      RD (inverted)
+; 6     E       Enable (SCLK)           D1      Port 7 (inverted)
+; 7     DB0     Data                    N/A     D0
+; 8     DB1     Data                    N/A     D1
+; 9     DB2     Data                    N/A     D2
+; 10    DB3     Data                    N/A     D3
+; 11    DB4     Data                    N/A     D4
+; 12    DB5     Data                    N/A     D5
+; 13    DB6     Data                    N/A     D6
+; 14    DB7     Data                    N/A     D7
+; 15    PSB     Serial/Para             GND     5v
+; 16    NC
+; 17    RST     Reset                   RST     RST
+; 18    VEE     LCD Drive               N/A     N/A
+; 19    A       Backlight               5v/NC   5v/NC
+; 20    K       Backlight               GND/NC  GND/NC
 ;
-; Note: At this stage, only Parallel data mode is posible,  Serial Mode hasn't
-;       been implemented yet. (future work)
 ;
-        ORG 3000H 		;Start location
+        ORG 3000H               ;Start location
         
 ; Modifiable values.  Thse three values can be modified to suit your own set up
 ; LCD_IR and LCD_DR are the output ports to send an Instruction or Data value.
@@ -49,12 +47,19 @@
         
 ;Port 7 on TEC is connected to LCD Enable (Pin 6)
 ;A7 is connected to Register select (Pin 4).  (A7=0 for Instruction, A7=1 for Data)
-LCD_IR:	EQU 07H 		;Instruction Register
-LCD_DR:	EQU 87H 		;Data Register (A7)
-V_DELAY_US:	EQU 0004H 		;Delay for 76us on your system
-        
+LCD_IR:	EQU 07H         ;Instruction Register
+LCD_DR:	EQU 87H         ;Data Register (A7)
+LCD_SER: EQU 07H        ;Serial Port if used
+V_DELAY_US: EQU 0004H   ;Delay for 76us on your system
+
+;Serial or Parallel communications to the LCD Screen.  Comment one of 
+;the labels below based on the LCD connections. 00H = FALSE, 01H = TRUE
+COMMS_MODE: EQU 00H     ;Using PARALLEL Data connection
+;COMMS_MODE: EQU 01H     ;Using SERIAL Data connection
+
 ; Dont need to modify anything else below.
-        
+SER_BT: EQU 11111000B           ;Serial Synchronisation Byte
+
 ; Jump Table
 ;-----------
         
@@ -77,23 +82,28 @@ V_DELAY_US:	EQU 0004H 		;Delay for 76us on your system
         JP DELAY_MS             ;Millisecond delay for LCD updates
         JP SET_BUF_CLEAR        ;Clear the Graphics buffer on after Plotting to the screen
         JP SET_BUF_NO_CLEAR     ;Retain the Graphics buffer on after Plotting to the screen
+        JP CLEAR_PIXEL          ;Remove a Pixel at X,Y
+        JP FLIP_PIXEL           ;Flip a Pixel On/Off at X,Y
+        JP LCD_INST             ;Send a parallel or serial instruction to LCD
+        JP LCD_DATA             ;Send a parallel or serial datum to LCD
+        JP SER_SYNC             ;Send serial synchronise byte to LCD
         
 ; Initialise LCD
-INIT_LCD:	
-        LD HL, INIT_BASIC ;POINT HL TO LCD INITIALIZE TABLE
-        LD B, 04H 		;B=4 BYTES
-        LD C, LCD_IR 	;C=PORT 7
-NEXT_CMD:	
-        CALL DELAY_US
-        OUTI 			;OUTPUT (HL) TO (C). HL=HL+1,B=B-1
-        JR NZ, NEXT_CMD
-        LD DE, 0140H 	;1.6 ms
+INIT_LCD:
+        LD HL, INIT_BASIC       ;POINT HL TO LCD INITIALIZE TABLE
+        LD B, 04H               ;B=4 BYTES
+NEXT_CMD:
+        LD A, (HL)
+        CALL LCD_INST
+        INC HL
+        DJNZ NEXT_CMD
+        LD DE, 0140H            ;1.6 ms
         CALL DELAY_MS
         
         CALL CLEAR_GR_LCD
         
 ; Clears the Graphics Memory Buffer
-CLEAR_GBUF:	
+CLEAR_GBUF:
         LD HL, GBUF
         LD DE, GBUF + 1
         XOR A
@@ -103,71 +113,62 @@ CLEAR_GBUF:
         RET
         
 ; Clears the Graphics LCD Buffer
-CLEAR_GR_LCD:	
+CLEAR_GR_LCD:
         CALL SET_GR_MODE
-        LD B, 00H
-CLR_X:	
         LD C, 00H
-CLR_Y:	
+CLR_X:
         LD A, 80H
         OR C
-        OUT (LCD_IR), A
-        CALL DELAY_US
+        CALL LCD_INST
         LD A, 80H
-        OR B
-        OUT (LCD_IR), A
-        CALL DELAY_US
-        XOR A
-        OUT (LCD_DR), A
-        CALL DELAY_US
-        OUT (LCD_DR), A
-        CALL DELAY_US
+        CALL LCD_INST
+        LD A, 02H 
+        CALL SER_SYNC           ;Data Block Sync
+        XOR A                   ;Clear Byte
+        LD B, 10H
+CLR_Y:
+        CALL LCD_DATA
+        CALL LCD_DATA
+        DJNZ CLR_Y
         INC C
         LD A, C
         CP 20H
-        JR NZ, CLR_Y
-        INC B
-        LD A, B
-        CP 10H
-        JR NZ, CLR_X
+        JR NZ, CLR_X        
         RET
-        
+
 ; Clears the ASCII Text LCD
-CLEAR_TXT_LCD:	
+CLEAR_TXT_LCD:
         CALL SET_TXT_MODE
         LD A, 80H
-        OUT (LCD_IR), A
-        CALL DELAY_US
+        CALL LCD_INST
+        LD A, 02H 
+        CALL SER_SYNC           ;Data Block Sync
         LD B, 40H
-CLR_ROWS:	
+CLR_ROWS:
         LD A,  " "
-        OUT (LCD_DR), A
-        CALL DELAY_US
+        CALL LCD_DATA
         DJNZ CLR_ROWS
         RET
         
 ; Set Graphics Mode
-SET_GR_MODE:	
+SET_GR_MODE:
         LD A, 34H
-        OUT (LCD_IR), A
-        CALL DELAY_US
+        CALL LCD_INST
         LD A, 36H
-        OUT (LCD_IR), A
-        JP DELAY_US
+        JP LCD_INST
         
 ; Set Text Mode
-SET_TXT_MODE:	
+SET_TXT_MODE:
         LD A, 30H
-        OUT (LCD_IR), A
-        JP DELAY_US
+        JP LCD_INST
         
 ;Draw Box
 ;Inputs: BC = X0,Y0
 ;        DE = X1,Y1
 ;Destroys: HL
-DRAW_BOX:	
+DRAW_BOX:
         PUSH BC
-TOP:	
+TOP:
         CALL DRAW_PIXEL
         LD A, D
         INC B
@@ -177,7 +178,7 @@ TOP:
         
         PUSH BC
         LD C, E
-BOTTOM:	
+BOTTOM:
         CALL DRAW_PIXEL
         LD A, D
         INC B
@@ -186,7 +187,7 @@ BOTTOM:
         POP BC
         
         PUSH BC
-LEFT:	
+LEFT:
         CALL DRAW_PIXEL
         LD A, E
         INC C
@@ -196,7 +197,7 @@ LEFT:
         
         PUSH BC
         LD B, D
-RIGHT:	
+RIGHT:
         CALL DRAW_PIXEL
         LD A, E
         INC C
@@ -210,9 +211,9 @@ RIGHT:
 ;Inputs: BC = X0,Y0
 ;        DE = X1,Y1
 ;Destroys: HL
-FILL_BOX:	
+FILL_BOX:
         PUSH BC
-NEXT_PIXEL:	
+NEXT_PIXEL:
         CALL DRAW_PIXEL
         LD A, E
         INC C
@@ -242,7 +243,7 @@ NEXT_PIXEL:
 ; }
 ;Inputs: BC = X0,Y0
 ;        DE = X1,Y1
-DRAW_LINE:	
+DRAW_LINE:
 ;check that points are in range
         LD A, C
         CP 40H
@@ -311,7 +312,7 @@ DRAW_LINE:
         ADD HL, DE
         LD (ERR), HL
         
-LINE_LOOP:	
+LINE_LOOP:
 ;setPixel(x0,y0)
         CALL DRAW_PIXEL
         
@@ -325,7 +326,7 @@ LINE_LOOP:
         
 ;e2 = 2*err;
         LD HL, (ERR)
-        ADD HL, HL 		;E2
+        ADD HL, HL              ;E2
         
 ;if (e2 >= dy)  err += dy; x0 += sx;
         LD DE, (DY)
@@ -343,7 +344,7 @@ LINE_LOOP:
         LD B, A
         POP HL
         
-LL2:	
+LL2:
 ;if (e2 <= dx)  err += dx; y0 += sy;
         LD DE, (DX)
         OR A
@@ -351,7 +352,7 @@ LL2:
         ADD HL, DE
         JR Z, LL3
         JP P, LINE_LOOP
-LL3:	
+LL3:
         LD HL, (ERR)
         ADD HL, DE
         LD (ERR), HL
@@ -361,7 +362,7 @@ LL3:
         
         JR LINE_LOOP
         
-ABSHL:	
+ABSHL:
         BIT 7, H
         RET Z
         XOR A
@@ -390,28 +391,28 @@ ABSHL:
 ; }
 ;Inputs BC = xm,ym (Midpoint)
 ;       E = radius
-DRAW_CIRCLE:	
+DRAW_CIRCLE:
 ;   int x = -r, err = 2-2*r; /* II. Quadrant */
         XOR A
         SUB E
-        LD (SX), A 		;x
+        LD (SX), A              ;x
 ;   y = 0
         XOR A
-        LD (SY), A 		;y
+        LD (SY), A              ;y
 ;   RAD = r
         LD D, 00H
         LD A, E
-        LD (RAD), DE 	;r
+        LD (RAD), DE            ;r
 ;   err = 2-2*r
         EX DE, HL
         ADD HL, HL
         EX DE, HL
         LD HL, 0002H
         OR A
-        SBC HL, DE 		;err
+        SBC HL, DE              ;err
         LD (ERR), HL
         
-CIRCLE_LOOP:	
+CIRCLE_LOOP:
 ;       setPixel(xm-x, ym+y); /*   I. Quadrant */
         PUSH BC
         LD A, (SX)
@@ -479,7 +480,7 @@ CIRCLE_LOOP:
         ADD HL, DE
         LD (ERR), HL
 ;       if (r > x || err > y) err += ++x*2+1; /* e_xy+e_x > 0 or no 2nd y-step */
-DS1:	
+DS1:
         LD HL, (RAD)
         LD A, (SX)
         LD D, 0FFH
@@ -498,7 +499,7 @@ DS1:
         ADD HL, DE
         JR Z, DS3
         JP M, DS3
-DS2:	
+DS2:
         LD A, (SX)
         INC A
         LD (SX), A
@@ -510,7 +511,7 @@ DS2:
         ADD HL, DE
         LD (ERR), HL
 ;   } while (x < 0);
-DS3:	
+DS3:
         LD A, (SX)
         OR A
         JP NZ, CIRCLE_LOOP
@@ -520,13 +521,13 @@ DS3:
 ;Fills a circle by increasing radius until Radius = Original Radius E
 ;Inputs BC = xm,ym (Midpoint)
 ;       E = radius
-FILL_CIRCLE:	
-        LD D, 01H 		;Start radius
-NEXT_CIRCLE:	
-        PUSH DE 		;Save end Radius
+FILL_CIRCLE:
+        LD D, 01H               ;Start radius
+NEXT_CIRCLE:
+        PUSH DE                 ;Save end Radius
         LD E, D
         CALL DRAW_CIRCLE
-        POP DE 			;Restore Radius
+        POP DE                  ;Restore Radius
         LD A, E
         INC D
         CP D
@@ -536,7 +537,7 @@ NEXT_CIRCLE:
 ;Draw Pixel in position X Y
 ;Input B = column/X (0-127), C = row/Y (0-63)
 ;destroys HL
-DRAW_PIXEL:	
+DRAW_PIXEL:
         LD A, C
         CP 40H
         RET NC
@@ -545,6 +546,60 @@ DRAW_PIXEL:
         RET NC
         
         PUSH DE
+        CALL SET_GBUF
+
+        LD A, D
+        OR (HL)
+        LD (HL), A
+        POP DE
+        RET
+
+;Clear Pixel in position X Y
+;Input B = column/X (0-127), C = row/Y (0-63)
+;destroys HL
+CLEAR_PIXEL:
+        LD A, C
+        CP 40H
+        RET NC
+        LD A, B
+        CP 80H
+        RET NC
+        
+        PUSH DE
+        CALL SET_GBUF
+
+        LD A, D
+        CPL
+        AND (HL)
+        LD (HL), A
+        POP DE
+        RET
+
+;Flip Pixel in position X Y
+;Input B = column/X (0-127), C = row/Y (0-63)
+;destroys HL
+FLIP_PIXEL:
+        LD A, C
+        CP 40H
+        RET NC
+        LD A, B
+        CP 80H
+        RET NC
+        
+        PUSH DE
+        CALL SET_GBUF
+
+        LD A, D
+        XOR (HL)
+        LD (HL), A
+        POP DE
+        RET
+
+;Helper routine to set HL to the correct GBUF address given X and Y
+;Input B = column/X (0-127), C = row/Y (0-63)
+;Output HL = address of GBUF X,Y byte, D = Byte with Pixel Bit Set
+;Destroys E
+SET_GBUF:
         LD L, C
         LD H, 00H
         ADD HL, HL
@@ -556,7 +611,7 @@ DRAW_PIXEL:
         
         LD A, B
         LD D, 08H
-BASE_COL:	
+BASE_COL:
         INC HL
         SUB D
         JR NC, BASE_COL
@@ -564,49 +619,41 @@ BASE_COL:
         CPL
         LD D, 01H
         OR A
-        JR Z, UPD_GBUF
-SHIFT_BIT:	
+        RET Z
+SHIFT_BIT:
         SLA D
         DEC A
         JR NZ, SHIFT_BIT
-        
-UPD_GBUF:	
-        LD A, D
-        OR (HL)
-        LD (HL), A
-        POP DE
         RET
-        
+
 ;Main draw routine.  Moves GBUF to LCD and clears buffer
 ;Destroys all
-PLOT_TO_LCD:	
+PLOT_TO_LCD:
         LD HL, GBUF
         LD C, 80H
-PLOT_ROW:	
+PLOT_ROW:
         LD A, C
         AND 9FH
-        OUT (LCD_IR), A ;Vertical
-        CALL DELAY_US
+        CALL LCD_INST           ;Vertical
         LD A, 80H
         BIT 5, C
         JR Z, $ + 4
         OR 08H
-        OUT (LCD_IR), A ;Horizontal
-        CALL DELAY_US
-        
-        LD B, 10H 		;send eight double bytes (16 bytes)
-PLOT_COLUMN:	
+        CALL LCD_INST           ;Horizontal
+        LD A, 02H 
+        CALL SER_SYNC           ;Data Block Sync
+        LD B, 10H               ;send eight double bytes (16 bytes)
+PLOT_COLUMN:
         LD A, (HL)
-        OUT (LCD_DR), A ;Byte 1
+        CALL LCD_DATA
         LD A, (CLRBUF)
         OR A
         JR Z, $ + 4
-        LD (HL), 00H 	;Clear Buffer if CLRBUF is non zero
-        CALL DELAY_US
+        LD (HL), 00H            ;Clear Buffer if CLRBUF is non zero
         INC HL
         DJNZ PLOT_COLUMN
         INC C
-        BIT 6, C 		;Is Row = 64?
+        BIT 6, C                ;Is Row = 64?
         JR Z, PLOT_ROW
         RET
         
@@ -618,7 +665,7 @@ PLOT_COLUMN:
 ;   CALL PRINT_STRING
 ;   DB "This Text",0
 ;
-PRINT_STRING:	
+PRINT_STRING:
         LD B, A
         CALL SET_TXT_MODE
         LD HL, ROWS
@@ -628,19 +675,18 @@ PRINT_STRING:
         INC H
         LD L, A
         LD A, (HL)
-        OUT (LCD_IR), A
-        CALL DELAY_US
-        
+        CALL LCD_INST
+        LD A, 02H 
+        CALL SER_SYNC           ;Data Block Sync
         POP HL
-DS_LOOP:	
+DS_LOOP:
         LD A, (HL)
         INC HL
         OR A
         JR Z, DS_EXIT
-        OUT (LCD_DR), A
-        CALL DELAY_US
+        CALL LCD_DATA
         JR DS_LOOP
-DS_EXIT:	
+DS_EXIT:
         JP (HL)
         
 ;Print Characters at a position X,Y
@@ -650,7 +696,7 @@ DS_EXIT:
 ;a space before the chracter.
 ;Input B = column/X (0-7), C = row/Y (0-3)
 ;      HL = Start address of text to display, terminate with 0
-PRINT_CHARS:	
+PRINT_CHARS:
         CALL SET_TXT_MODE
         LD DE, ROWS
         LD A, C
@@ -660,43 +706,135 @@ PRINT_CHARS:
         LD E, A
         LD A, (DE)
         ADD A, B
-        OUT (LCD_IR), A
-        CALL DELAY_US
-PC_LOOP:	
+        CALL LCD_INST
+        LD A, 02H 
+        CALL SER_SYNC           ;Data Block Sync
+PC_LOOP:
         LD A, (HL)
         INC HL
         OR A
         RET Z
-        OUT (LCD_DR), A
-        CALL DELAY_US
+        CALL LCD_DATA
         JR PC_LOOP
         
 ; Delay for LCD write
-DELAY_US:	
-        LD DE, V_DELAY_US ;DELAY BETWEEN, was 0010H
-DELAY_MS:	
-        DEC DE 			;EACH BYTE
-        LD A, D 		;AS PER
-        OR E 			;LCD MANUFACTER'S
-        JR NZ, DELAY_MS ;INSTRUCTIONS
+DELAY_US:
+        LD DE, V_DELAY_US       ;DELAY BETWEEN, was 0010H
+DELAY_MS:
+        DEC DE                  ;EACH BYTE
+        LD A, D                 ;AS PER
+        OR E                    ;LCD MANUFACTER'S
+        JR NZ, DELAY_MS         ;INSTRUCTIONS
         RET
         
 ; Set Buffer Clearing after outputting to LCD
 ; Input: A = 0 Buffer to be cleared, A <> 0 Buffer kept
-SET_BUF_CLEAR:	
+SET_BUF_CLEAR:
         LD A, 0FFH
         LD (CLRBUF), A
-        JP Z, CLEAR_GBUF
+        JP CLEAR_GBUF
         
-SET_BUF_NO_CLEAR:	
+SET_BUF_NO_CLEAR:
         XOR A
         LD (CLRBUF), A
         RET
-        
+
+;Serial/Paralled Communication routines
+;Send information to the LCD screen via SERIAL or PARALLEL connection.  Parallel is straight
+;forward.  Just send the Byte in the Accumilator to the relevante Instruction or Data port.
+;Then call a delay for that byte to be processed by the LCD.
+;For Serial communication, three Bytes are to be sent using the SPI protocol.
+;The first byte is a synchronise/configuration byte.  This sets
+;the Data/Instruction register bit.  The second and third bytes is the actual data to send.
+;It is split into two bytes with 4 bits of data set at the upper nibble and zeros for the rest.
+;A maximum of 256 Bytes of Data information can be send with only one Synchronise Byte.  The
+;LCD Data routine doesn't send the sync byte.  It needs to be done prior by calling SER_SYNC first.
+;
+;The two routines to use are:
+;LCD_DATA, Sends Data information.  Along with SER_SYNC called prior and
+;LCD_INST, Sends Instruction information
+
+;Send to LCD Instruction register
+;If serial connection it will send the byte with a synchronise byte.
+;If parallel byte is sent to the Instruction register port and a delay is triggered
+;Input: A = Byte to send
+LCD_INST:
+IF COMMS_MODE
+        PUSH AF
+        XOR A
+        CALL SER_SYNC
+        POP AF
+        JP SER_BYTE
+ELSE
+        OUT (LCD_IR), A
+        JP DELAY_US
+ENDIF
+
+;Send to LCD Data register
+;If serial connection it will send the byte with no synchronise byte.  The
+;synchronise byte is to be sent separately.
+;If parallel byte is sent to the Data register port and a delay is triggered
+;Input: A = Byte to send
+LCD_DATA:
+IF COMMS_MODE
+        JP SER_BYTE
+ELSE
+        OUT (LCD_DR), A
+        JP DELAY_US
+ENDIF
+
+;Serial Byte Send
+;Send a Byte in two halfs,  First half is the upper nibble with 4 zeros and second
+;byte is the lower nibble shifted to the upper nibble with 4 zeros.
+;   EG: if Byte to send is 10010110B, then
+;   BYTE 1 = 10010000b and
+;   BYTE 2 = 01100000b
+;Input: A = byte to send
+SER_BYTE:
+        PUSH AF
+        CALL SEND_PART
+        POP AF
+        RLCA
+        RLCA
+        RLCA
+        RLCA
+SEND_PART:
+        AND 0F0H                ;Mask out lower nibble
+        JP SPI_WR               ;Send First Half of Command/Data byte
+
+;Serial Synchronise Byte
+;Send 5 consecutive '1's then '000's for instruction or '010' for data.
+;Input: A = 0x00 for instruction register and 0x02 if data register
+SER_SYNC:
+IF COMMS_MODE
+        OR SER_BT
+ELSE
+        RET
+ENDIF
+
+;SPI Write Routine.
+;Send a byte to the LCD using the SPI protocol
+;Inputs: A = Byte to be sent
+SPI_WR:
+        PUSH BC
+        LD B, 08H       ;Eight Bits to send
+        LD C, A         ;SPI Byte
+        XOR A           ;Clear A
+CLK_LOOP:
+        RLC C           ;Put Bit 7 in Carry Flag
+        ADC A,A         ;Set Bit 0 with Carry Flag
+        OR 02H          ;Set SCLK high (pulse clock)
+        OUT (LCD_SER),A ;Output to LCD
+        XOR A           ;Set SCLK low (and SID)
+        OUT (LCD_SER),A ;Output to LCD
+        DJNZ CLK_LOOP   ;Get next Bit
+        POP BC
+        RET
+
 ; Contstants
-ROWS:	DB      80H,90H,88H,98H ;Text Row start position
+ROWS:   DB      80H,90H,88H,98H ;Text Row start position
         
-INIT_BASIC:	
+INIT_BASIC:
         DB      30H             ;8 Bit interface, basic instruction
         DB      0CH             ;display on, cursor & blink off
         DB      06H             ;cursor move to right ,no shift
@@ -704,13 +842,15 @@ INIT_BASIC:
         
 ; RAM Locations - Move this section to RAM if necessary
 ;---------------
+
+        ;ORG 1000H              ;Start location
         
-GBUF:	DS 0400H 		;Graphics Buffer 16 * 64 = 1024 byte
-ENDPT:	DW 0000H 		;End Point for Line
-SX:	DB 00H 			;Sign of X
-SY:	DB 00H 			;Sign of Y
-DX:	DW 0000H 		;Change of X
-DY:	DW 0000H 		;Change of Y
-ERR:	DW 0000H 		;Error Rate
-RAD:	DW 0000H 		;Radius
-CLRBUF:	DB 00H 			;Clear Buffer Flag on LCD Displaying
+GBUF:   DS 0400H        ;Graphics Buffer 16 * 64 = 1024 byte
+ENDPT:  DW 0000H        ;End Point for Line
+SX:     DB 00H          ;Sign of X
+SY:     DB 00H          ;Sign of Y
+DX:     DW 0000H        ;Change of X
+DY:     DW 0000H        ;Change of Y
+ERR:    DW 0000H        ;Error Rate
+RAD:    DW 0000H        ;Radius
+CLRBUF: DB 00H          ;Clear Buffer Flag on LCD Displaying
