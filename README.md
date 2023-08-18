@@ -10,7 +10,6 @@ The above image demonstrates most of the graphical routines.  This includes line
 - [Files in this repository](#files-in-this-repository)
 - [LCD Screens](#lcd-screens)
 - [Example Code](#example-code)
-- [Configuration](#configuration)
 - [Programming Guide](#programming-guide)
   - [INIT\_LCD](#init_lcd)
   - [CLEAR\_GBUF](#clear_gbuf)
@@ -95,10 +94,9 @@ __<sup>4</sup>__ I use `Port 7` and `A7` to connect the LCD screen to the TEC co
 
 To see the library working, have a look at the example code provided.  The [LDC\_3D\_demo.z80](lcd_3d_demo.z80) has a `DISPLAY_MENU` label that displays the above picture.  Look at this piece of code for better understanding.
 
-Also, see the library and these files in action on [YouTube](https://youtu.be/xADbvfVs6Mg)!
+Also, see the library and these files in action on [YouTube](https://youtu.be/xADbvfVs6Mg) and [YouTube](https://youtu.be/tZHt6CwbkVA)!
 
-## Configuration
-
+Thanks to [PCBWay](https://www.pcbway.com) for sponsoring this video.  ** For $5 off your first order at PCBWay, click [here](https://www.pcbway.com/setinvite.aspx?inviteid=599966) **.  PCBWay Printed Circuit Boards the Easy Way.
 
 ## Programming Guide
 
