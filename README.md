@@ -50,8 +50,8 @@ The above image demonstrates most of the graphical routines.  This includes line
 ## LCD Screens
 There are a few variants of these LCD screens, but all typically use the [ST7920](./ST7920.pdf) LCD Controller.  The LCD Screen that I used is the [QC12864B](./QC12864B.pdf).  This screen has two ST7921 Panels (128 x 32) stacked one above the other.  Other LCD boards might not do this.  If so, the [PLOT\_TO\_LCD](#plot_to_lcd) function will need to be modified. (future work)
 
-<img src="img\QC12864B_front.png" style="float: left;" width="400">
-<img src="img\QC12864B_back.png" width="400">
+<img src="img\QC12864B_front.png" style="float: left;" width="300">
+<img src="img\QC12864B_back.png" width="300">
 These screens have Graphics Display RAM (GDRAM) and Display Data RAM (DDRAM) areas.  GDRAM is for drawing pixels and DDRAM is for displaying text or characters.  Both RAM areas __can be__ displayed at the same time.
 
 The Pinout and connection to the Z80 for the QC12864B board is as follows:
