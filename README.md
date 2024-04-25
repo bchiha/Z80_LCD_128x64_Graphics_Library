@@ -35,6 +35,16 @@ The above image demonstrates most of the graphical routines.  This includes line
   - [LCD\_INST](#lcd_inst)
   - [LCD\_DATA](#lcd_data)
   - [SER\_SYNC](#ser_sync)
+  - [DRAW\_GRAPHIC](#draw_graphic)
+  - [INV\_GRAPHIC](#inv_graphic)
+  - [INIT\_TERMINAL](#init_terminal)
+  - [SEND\_CHAR\_TO\_GLCD](#send_char_to_glcd)
+  - [SEND\_STRING\_TO\_GLCD](#send_string_to_glcd)
+  - [SEND\_A\_TO\_GLCD](#send_a_to_glcd)
+  - [SEND\_HL\_TO\_GLCD      ;Send register HL to the LCD](#send_hl_to_glcd------send-register-hl-to-the-lcd)
+  - [SET\_CURSOR](#set_cursor)
+  - [GET\_CURSOR](#get_cursor)
+  - [DISPLAY\_CURSOR](#display_cursor)
 - [Future Work](#future-work)
 
 ## Files in this repository
@@ -485,9 +495,166 @@ Send a Serial Synchronization Byte to the LCD.  This routine is only needed for 
     CALL LCD_DATA
 ```
 
+### DRAW_GRAPHIC
+
+Draw an ASCII character or Sprite to the LCD at the current cursor.  ASCII characters are 6x6 or 5x5 Pixels and most have a gap to the left and bottom for spacing. [PLOT\_TO\_LCD](#plot_to_lcd) is still required to be called after all graphics have been drawn.
+
+Graphics data is in the format of up to 16 bytes across and 64 bytes down, where a `BIT` set will indicate a pixel to be drawn.  If graphics is less than 8 bits wide, then bits are read from the least significant bit.
+
+- Entry:
+  - A = ASCII number **or** if A=0 Then 
+    - HL = Address of graphic data
+    - B = width of graphic in pixels (1-128)
+    - C = height of graphic in pixels (1-64)
+- Exit: All Corrupt
+
+```
+    LD A, 00H         ;Custom graphic
+    LD HL, PICTURE    ;Data table address
+    LD B, 16          ;B=16 pixels wide
+    LD C, 08          ;C=8 pixels down
+    CALL DRAW_GRAPHIC ;Draw the GLCD Buffer
+    CALL PLOT_TO_LCD  ;Display on GLCD
+
+PICTURE:
+    .db 10000011b,11000001b
+    .db 10000100b,00100001b
+    .db 10001010b,01010001b
+    .db 10001000b,00010001b
+    .db 10001010b,01010001b
+    .db 10001001b,10010001b
+    .db 10000100b,00100001b
+    .db 10000011b,11000001b
+```
+
+This example will display this image from the current cursor position
+<img src="img\draw_graphic.png" width="300">
+
+### INV_GRAPHIC
+
+Inverse graphics printing.  Calling this routine will TOGGLE the inverse drawing flag.  The initial state is normal.  If in inverse mode, a pixel drawn using the [DRAW\_GRAPHIC](#draw_graphic) routine is displayed if a `BIT` is not set.
+
+- Exit: AF corrupt
+
+```
+    CALL INV_GRAPHIC    ;Toggle inverse flag
+```
+
+### INIT_TERMINAL
+
+Initialize the LCD for terminal emulation.  This routine is to be called before any TERMINAL routine is called.  It will set up the graphics and scroll buffers.  It also Clears the GBUF, sets cursor to top left and displays cursor.  This routine will as call [INIT\_LCD](#init_lcd).
+
+- Exit: All Corrupt
+
+```
+    CALL INIT_TERMINAL   ;Start terminal emulation
+```        
+
+### SEND_CHAR_TO_GLCD
+
+Send or handle ASCII characters to the GLCD screen.  This routines displays ASCII characters to the GLCD screen and handles some special control characters.  It also handles scrolling history of 10 lines.  Characters are drawn at the current cursor position.  The Cursor will increment when a character is drawn.  Character will automatically be displayed on the LCD.
+
+Some special characters are:
+- CR / 0DH = will move the cursor down and reset it column
+- LF / 0AH = is ignored
+- BS / 08H = will delete the character at the cursor and move cursor back one
+- HT / 09H = will TAB 4 spaces
+- UP / 05H = will scroll up one line if any
+- DN / 06H = will scroll down one line if any
+
+- Entry:
+  - A = ASCII character to send to the GLCD screen. **OR**
+  - A = 0, draw the cursor only
+- Exit: All Corrupt
+
+```
+    LD A,65     ;ASCII 'A'
+    CALL SEND_CHAR_TO_GLCD    ;Display on LCD
+    LD A,0DH    ;Carriage Return
+    CALL SEND_CHAR_TO_GLCD    ;Do a CR on the LCD
+```
+
+### SEND_STRING_TO_GLCD
+
+Send a string of characters to the GLCD.  Prints a string pointed by DE.  It stops printing and returns when either a CR is printed or when the next byte is the same as what is in register A.
+
+- Entry:
+  - DE = address of string to print
+  - A = character to stop printing. 
+- Exit: All Corrupt
+
+```
+    LD DE,TEXT      ;Text to display 
+    XOR A           ;Terminate with 0
+    CALL SEND_STRING_TO_GLCD
+
+TEXT: .db "Hello World!",0
+```
+
+### SEND_A_TO_GLCD
+
+Display the register A in ASCII on the GLCD at the current cursor
+
+- Entry:
+  - A = value to convert and display
+
+```
+    LD A,7BH        ;Set A=7BH
+    CALL SEND_A_TO_GLCD ;Display "7B" on LCD
+```
+
+### SEND_HL_TO_GLCD      ;Send register HL to the LCD
+
+Display the register HL in ASCII on the GLCD at the current cursor
+
+- Entry:
+  - HL = value to convert and display
+
+```
+    LD HL,0A6C0H         ;Set HL=0A6C0H
+    CALL SEND_HL_TO_GLCD ;Display "A6C0" on LCD
+```
+
+### SET_CURSOR
+
+Set the Graphic cursor position for Terminal Emulation.  Update is ignored if either X,Y input is out of bounds.
+
+- Entry:
+  - B = X position in pixels (0-127)
+  - C = Y position in pixels (0-63)
+- Exit: AF corrupt
+
+```
+    LD BC,4020H     ;Set cursor to middle of screen
+    CALL SET_CURSOR
+```
+
+### GET_CURSOR
+
+Get the current cursor position
+
+- Exit:
+  - B = X position in pixels (0-127)
+  - C = Y position in pixels (0-63)
+
+```
+    CALL GET_CURSOR
+```
+
+### DISPLAY_CURSOR
+Turn the cursor ON or OFF.  Default is Cursor ON
+
+- Entry:
+  - A = 0, Turn cursor on, A = non zero, Turn cursor off
+
+```
+    LD A,1    
+    CALL DISPLAY_CURSOR ;Turn cursor off
+```
+
 ## Future Work
 
-Displaying Text on this screen is clumsy as text can only be placed at defined locations.  I plan to make a graphics font of 128 characters that is smaller in size, possibly 5x7 and can be placed anywhere on the screen.
+ ~~Displaying Text on this screen is clumsy as text can only be placed at defined locations.  I plan to make a graphics font of 128 characters that is smaller in size, possibly 5x7 and can be placed anywhere on the screen.~~
 
 Some LCD screens have a slightly different way data is written to them in terms of how the screens are laid out.  The [QC12864B](./QC12864B.pdf) as two ST9721 screens placed on top of each other, but are connected in series.  Plotting to the LCD routine will need to be changed for other LCD screen layouts.
 

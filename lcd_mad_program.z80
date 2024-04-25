@@ -8,15 +8,15 @@
 ; See:	https://meatfighter.com/mad/
         
 ; This program generates the face similar to the BASIC code, one stroke at a time.
-        ORG 2000H
+        ORG 1000H
         
 ; Graphics library routines used
-G_INIT_LCD:	EQU 3000H
-G_SET_GR_MODE:	EQU 300CH
-G_DRAW_LINE:	EQU 3015H
-G_PLOT_TO_LCD:	EQU 3024H
-G_SET_BUF_CLEAR:	EQU 3033H
-G_SET_BUF_NO_CLEAR:	EQU 3036H
+G_INIT_LCD:	EQU 2000H
+G_SET_GR_MODE:	EQU 200CH
+G_DRAW_LINE:	EQU 2015H
+G_PLOT_TO_LCD:	EQU 2024H
+G_SET_BUF_CLEAR: EQU 2033H
+G_SET_BUF_NO_CLEAR: EQU 2036H
         
 START:	
         CALL G_INIT_LCD
