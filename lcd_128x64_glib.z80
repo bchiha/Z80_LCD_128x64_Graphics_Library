@@ -779,6 +779,7 @@ INIT_TERMINAL:
 ;current cursor position.  Cursor increments if characger is drawn.
 ;       CR / 0DH = will move the cursor down and reset it column
 ;       LF / 0AH = is ignored
+;       FF / 0CH = clears the terminal (restarts)
 ;       BS / 08H = will delete the character at the cursor and move cursor back one
 ;       HT / 09H = will TAB 4 spaces
 ;       UP / 05H = will scroll up one line if any
@@ -807,12 +808,15 @@ DO_CR:
         CP LF      ;LF
         RET Z
         CP CR      ;CR
-        JR NZ,DO_BS
+        JR NZ,DO_FF
         LD A,SPACE              ;Clear Cursor
         CALL DRAW_GRAPHIC
         CALL INC_ROW
         LD (CURSOR_YS),A        ;Save start row
         JR DRAW_CURSOR
+DO_FF:
+        CP CS                   ;Form Feed / Clear Screen
+        JR Z,INIT_TERMINAL      ;Reset All.
 DO_BS:
         CP BKSP                 ;Backspace
         JR NZ,DO_TAB
@@ -857,6 +861,8 @@ PS1:
         JR Z,DRAW_CURSOR        ;Yes exit and plot LCD screen
         CP CR                   ;Is it a CR?
         JR Z,DO_CR              ;Yes do a CR and plot LCD screen and exit
+        CP CS                   ;Is it a FF?
+        JR Z,DO_FF              ;Yes do a Form Feed and plot LCD screen and exit
         EXX                     ;Save bulk registers
         CALL DRAW_GRAPHIC       ;Draw the character
         CALL INC_CURSOR         ;Move cursor by one
